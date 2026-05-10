@@ -59,7 +59,7 @@ export class MinimaxProvider implements AIProvider {
   private ensureConfig(): void {
     if (!this.apiKey) {
       throw createErrorResponse(
-        'MINIMAX_API_KEY is not configured',
+        'MINIMAX_API_KEY is not configured or empty',
         'invalid_request_error',
         ErrorCodes.PROVIDER_CONFIG_MISSING,
         500
@@ -70,8 +70,8 @@ export class MinimaxProvider implements AIProvider {
   async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
     this.ensureConfig();
 
-    const url = `${this.baseUrl}/messages`;
-    console.log(`[MINIMAX] POST ${url}`);
+    const model = request.model || this.model;
+    console.log(`[MINIMAX] chatCompletion | model=${model} | baseUrl=${this.baseUrl}`);
 
     const systemMessage = request.messages.find(m => m.role === 'system');
     const userMessages = request.messages.filter(m => m.role !== 'system');
@@ -81,8 +81,8 @@ export class MinimaxProvider implements AIProvider {
       content: m.content,
     }));
 
-const anthropicRequest: AnthropicRequest = {
-      model: this.model,
+    const anthropicRequest: AnthropicRequest = {
+      model,
       messages: anthropicMessages,
       max_tokens: request.max_tokens || 4096,
       temperature: request.temperature,
@@ -90,7 +90,8 @@ const anthropicRequest: AnthropicRequest = {
       ...(systemMessage && { system: systemMessage.content }),
     };
 
-    console.log(`[MINIMAX] body:`, JSON.stringify(anthropicRequest));
+    const url = `${this.baseUrl}/messages`;
+    console.log(`[MINIMAX] POST ${url}`);
 
     const response = await fetch(url, {
       method: 'POST',
@@ -102,7 +103,7 @@ const anthropicRequest: AnthropicRequest = {
       body: JSON.stringify(anthropicRequest),
     });
 
-    console.log(`[MINIMAX] response: ${response.status} ${response.statusText}`);
+    console.log(`[MINIMAX] response: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -125,7 +126,7 @@ const anthropicRequest: AnthropicRequest = {
       id: data.id || `minimax-${Date.now()}`,
       object: 'chat.completion',
       created: Math.floor(Date.now() / 1000),
-      model: data.model || this.model,
+      model: data.model || model,
       choices: [{
         index: 0,
         message: {

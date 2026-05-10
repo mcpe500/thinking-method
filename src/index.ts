@@ -39,9 +39,23 @@ app.post('/v1/chat/completions', async (c) => {
   });
 
   const resolution = resolveModel(body.model || '');
+  console.log(`[REQ] ${requestId} | resolved: provider=${resolution.success ? resolution.data.provider : 'ERROR'} model=${resolution.success ? resolution.data.upstreamModel : 'ERROR'}`);
+
   if (!resolution.success) {
     logError(requestId, resolution.error.code, resolution.error.message);
     return c.json(resolution.error.toJSON(), resolution.error.status as any);
+  }
+
+  const upstreamModel = resolution.data.upstreamModel;
+  if (!upstreamModel || upstreamModel === 'unknown') {
+    const err = createErrorResponse(
+      `Invalid model resolution: upstreamModel='${upstreamModel}'. Check model format (e.g., 'minimax/MiniMax-M2.7')`,
+      'invalid_request_error',
+      'MODEL_RESOLUTION_FAILED',
+      400
+    );
+    logError(requestId, err.code, err.message);
+    return c.json(err.toJSON(), err.status as any);
   }
 
   const provider = registry.get(resolution.data.provider);
@@ -95,6 +109,36 @@ app.post('/v1/chat/completions', async (c) => {
       }],
       usage: pipelineResult.total_usage,
     };
+
+    if (body.stream) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          const chunk = {
+            id: response.id,
+            object: 'chat.completion.chunk',
+            created: response.created,
+            model: response.model,
+            choices: [{
+              index: 0,
+              delta: { content: pipelineResult.final_answer },
+              finish_reason: null,
+            }],
+          };
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+          const doneChunk = {
+            ...chunk,
+            choices: [{ ...chunk.choices[0], finish_reason: 'stop' }],
+          };
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(doneChunk)}\n\n`));
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+          controller.close();
+        },
+      });
+      c.header('Content-Type', 'text/event-stream');
+      c.header('Cache-Control', 'no-cache');
+      return c.body(stream);
+    }
 
     return c.json(response);
   } catch (error) {
