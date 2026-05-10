@@ -18,7 +18,7 @@ export interface ResolutionError {
 
 export function resolveModel(model: string): ResolutionResult | ResolutionError {
   const defaultProvider = env.DEFAULT_PROVIDER || 'minimax';
-  const defaultModel = env.DEFAULT_MODEL || 'abab6.5s-chat';
+  const defaultModel = env.DEFAULT_MODEL || 'MiniMax-M2.7';
 
   if (!model || model.trim() === '') {
     return {

@@ -3,35 +3,34 @@ import type { ChatCompletionRequest, ChatCompletionResponse, ModelList } from '.
 import { env } from '../config/env.js';
 import { createErrorResponse, ErrorCodes } from '../errors/openaiError.js';
 
-interface MinimaxMessage {
-  role: string;
+interface AnthropicMessage {
+  role: 'user' | 'assistant';
   content: string;
 }
 
-interface MinimaxRequest {
+interface AnthropicRequest {
   model: string;
-  messages: MinimaxMessage[];
+  messages: AnthropicMessage[];
+  max_tokens: number;
   temperature?: number;
   top_p?: number;
-  max_tokens?: number;
-  stream?: boolean;
+  system?: string;
 }
 
-interface MinimaxResponse {
+interface AnthropicResponse {
   id: string;
+  type: string;
+  role: string;
+  content: Array<{
+    type: 'text' | 'thinking';
+    text?: string;
+    thinking?: string;
+  }>;
   model: string;
-  choices: {
-    index: number;
-    message: {
-      role: string;
-      content: string;
-    };
-    finish_reason: string;
-  }[];
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
+  stop_reason: string;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
   };
 }
 
@@ -44,6 +43,7 @@ export class MinimaxProvider implements AIProvider {
     this.baseUrl = env.MINIMAX_BASE_URL;
     this.apiKey = env.MINIMAX_API_KEY || '';
     this.model = env.DEFAULT_MODEL;
+    console.log(`[MINIMAX] init | baseUrl=${this.baseUrl} | model=${this.model} | hasKey=${!!this.apiKey}`);
   }
 
   getCapabilities(): ProviderCapabilities {
@@ -52,7 +52,7 @@ export class MinimaxProvider implements AIProvider {
       functionCalling: false,
       vision: false,
       jsonMode: false,
-      maxContextTokens: 32000,
+      maxContextTokens: 270000,
     };
   }
 
@@ -70,26 +70,39 @@ export class MinimaxProvider implements AIProvider {
   async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
     this.ensureConfig();
 
-    const minimaxRequest: MinimaxRequest = {
-      model: request.model || this.model,
-      messages: request.messages.map(m => ({
-        role: m.role,
-        content: m.content,
-      })),
+    const url = `${this.baseUrl}/messages`;
+    console.log(`[MINIMAX] POST ${url}`);
+
+    const systemMessage = request.messages.find(m => m.role === 'system');
+    const userMessages = request.messages.filter(m => m.role !== 'system');
+
+    const anthropicMessages: AnthropicMessage[] = userMessages.map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    }));
+
+const anthropicRequest: AnthropicRequest = {
+      model: this.model,
+      messages: anthropicMessages,
+      max_tokens: request.max_tokens || 4096,
       temperature: request.temperature,
       top_p: request.top_p,
-      max_tokens: request.max_tokens,
-      stream: false,
+      ...(systemMessage && { system: systemMessage.content }),
     };
 
-    const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
+    console.log(`[MINIMAX] body:`, JSON.stringify(anthropicRequest));
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        'x-api-key': this.apiKey,
+        'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify(minimaxRequest),
+      body: JSON.stringify(anthropicRequest),
     });
+
+    console.log(`[MINIMAX] response: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -101,22 +114,31 @@ export class MinimaxProvider implements AIProvider {
       );
     }
 
-    const data = await response.json() as MinimaxResponse;
+    const data = await response.json() as AnthropicResponse;
+
+    const textContent = data.content
+      .filter(block => block.type === 'text')
+      .map(block => block.text || '')
+      .join('');
 
     return {
       id: data.id || `minimax-${Date.now()}`,
       object: 'chat.completion',
       created: Math.floor(Date.now() / 1000),
       model: data.model || this.model,
-      choices: data.choices.map((c, i) => ({
-        index: i,
+      choices: [{
+        index: 0,
         message: {
-          role: c.message.role as any,
-          content: c.message.content,
+          role: 'assistant',
+          content: textContent,
         },
-        finish_reason: c.finish_reason,
-      })),
-      usage: data.usage,
+        finish_reason: data.stop_reason || 'stop',
+      }],
+      usage: {
+        prompt_tokens: data.usage?.input_tokens || 0,
+        completion_tokens: data.usage?.output_tokens || 0,
+        total_tokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+      },
     };
   }
 
@@ -138,8 +160,18 @@ export class MinimaxProvider implements AIProvider {
     try {
       this.ensureConfig();
       const start = Date.now();
-      await fetch(`${this.baseUrl}/v1/models`, {
-        headers: { 'Authorization': `Bearer ${this.apiKey}` },
+      await fetch(`${this.baseUrl}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 10,
+        }),
       });
       return {
         status: 'healthy',

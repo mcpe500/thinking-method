@@ -32,9 +32,9 @@ Aturan konfigurasi Minimax:
 ## Resolution Rules
 
 ```text
-"minimax/abab6.5s-chat" -> provider=minimax, upstream_model=abab6.5s-chat
-"abab6.5s-chat" -> provider=DEFAULT_PROVIDER, upstream_model=abab6.5s-chat
-"" -> provider=DEFAULT_PROVIDER, upstream_model=DEFAULT_MODEL
+"minimax/MiniMax-M2.7" -> provider=minimax, upstream_model=MiniMax-M2.7
+"MiniMax-M2.7" -> provider=DEFAULT_PROVIDER, upstream_model=MiniMax-M2.7
+"" -> provider=DEFAULT_PROVIDER, upstream_model=MiniMax-M2.7
 ```
 
 ## Related Components

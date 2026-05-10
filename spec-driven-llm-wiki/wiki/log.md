@@ -57,4 +57,14 @@ Implemented Spec 001 in parent project `thinking-method`:
 - `npm run typecheck` - passed
 - `npm run validate-spec -- --all` - valid
 
+## [2026-05-10] fix | Corrected Minimax provider to use Anthropic-compatible API
+
+Fixed `src/providers/minimax.ts` and `src/config/env.ts`:
+- Base URL: `https://api.minimax.io/anthropic` (was incorrect)
+- Model: `MiniMax-M2.7` (was `abab6.5s-chat`)
+- Request format: Anthropic style with `x-api-key` header and `/messages` endpoint
+- Response parsing: Handle `content[]` array with `text` and `thinking` blocks
+
+Updated `.env.example` with correct defaults.
+
 **Note:** `graph` build requires `npm install` in `tools/` to install vis-network. Wiki component/decision pages already created during spec authoring phase.

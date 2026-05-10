@@ -16,6 +16,8 @@ const app = new Hono();
 
 app.use('*', cors());
 
+console.log(`[PROXY] Starting on port ${env.PORT} | baseURL: ${env.MINIMAX_BASE_URL} | model: ${env.DEFAULT_MODEL} | pipeline: ${env.THINKING_PIPELINE_ENABLED ? 'ON' : 'OFF'}(${env.THINKING_STEP_COUNT} steps)`);
+
 app.get('/health', (c) => {
   const providerStatuses = registry.healthAll();
   return c.json({
@@ -27,6 +29,8 @@ app.get('/health', (c) => {
 app.post('/v1/chat/completions', async (c) => {
   const requestId = generateRequestId();
   const body = await c.req.json() as ChatCompletionRequest;
+
+  console.log(`[REQ] ${requestId} | model=${body.model} | msgs=${body.messages?.length || 0} | stream=${body.stream || false}`);
 
   logPrompt({
     requestId,
@@ -137,6 +141,7 @@ app.post('/v1/chat/completions', async (c) => {
 
     return c.json(response);
   } catch (error) {
+    console.error(`[ERR] ${requestId} | ${error instanceof Error ? error.message : 'Unknown'}`);
     const message = error instanceof Error ? error.message : 'Unknown error';
     logError(requestId, 'PIPELINE_ERROR', message);
     return c.json({
