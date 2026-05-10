@@ -14,9 +14,11 @@ This wiki starts empty. It will accumulate project knowledge as specs are create
 - `spec-driven-llm-wiki` is a portable spec-driven development agent methodology.
 - The current repository includes a comprehensive master specification in `full-spec.md`.
 - Core deterministic tooling is intended to work offline.
+- Parent project `thinking-method` is being specified as a local OpenAI-compatible proxy for OpenCode.
+- The proxy scope includes provider selection, Minimax as the initial provider, multi-pass thinking orchestration, structured prompt/response logging, and training trace capture.
 
 ## Next Memory Updates
 
-- Add component pages as parent-project files are researched.
-- Add decisions when architecture tradeoffs are resolved.
-- Add patterns when repeated project conventions are discovered.
+- Implement Spec 001 after review.
+- Add implementation handoff when runtime files are created.
+- Rebuild graph after spec/wiki relationships are updated.
