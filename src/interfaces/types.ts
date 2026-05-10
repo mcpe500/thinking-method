@@ -3,7 +3,7 @@ export enum LogCategory { PROMPT = 'prompt', RESPONSE = 'response', METRICS = 'm
 export type MessageRole = 'system' | 'user' | 'assistant' | 'function' | 'tool'
 export interface LogMessage { role: MessageRole; content: string; name?: string; function_call?: { name: string; arguments: string } }
 export interface TokenUsage { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; details?: Record<string, unknown> }
-export interface TimingInfo { time_to_first_byte_ms?: number; total_duration_ms: number; request_received_at: string; response_sent_at: string }
+export interface TimingInfo { time_to_first_byte_ms?: number; total_duration_ms: number; request_received_at?: string; response_sent_at?: string }
 export interface RequestContext { request_id: string; user_id?: string; session_id?: string; ip_address?: string; user_agent?: string }
 export interface ModelInfo { provider: string; model: string; base_url?: string }
 export interface LogEntry { timestamp: string; level: LogLevel; category: LogCategory; request_id: string; context?: RequestContext; messages?: LogMessage[]; content?: string; model?: ModelInfo; token_usage?: TokenUsage; timing?: TimingInfo; success: boolean; error_code?: string; error_message?: string; is_streaming?: boolean; streaming_chunk_index?: number }
